@@ -135,7 +135,7 @@ class Tasks:
             return False
 
         self.logger.debug(f"Killing {task2kill}...")
-        os.system(f'taskkill /IM /F {task2kill}')
+        os.system(f'taskkill /IM {task2kill} /F')
         self.logger.debug(f"{task2kill} killed.")
         self.logger.debug(f"Sending killed confirmation to server...")
 
@@ -164,5 +164,3 @@ class Tasks:
         os.remove(self.task_path)
         self.logger.debug(f"Flushing stdout...")
         sys.stdout.flush()
-
-
