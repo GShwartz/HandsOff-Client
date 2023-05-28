@@ -1,4 +1,3 @@
-from dotenv import load_dotenv, dotenv_values
 from subprocess import Popen, PIPE
 import win32com.client as win32
 from datetime import datetime
@@ -14,7 +13,6 @@ import socket
 import psutil
 import ctypes
 import pickle
-import winreg
 import time
 import wget
 import uuid
@@ -291,7 +289,6 @@ class Welcome:
                 break
 
             try:
-                print(command)
                 if len(str(command)) == 0:
                     self.logger.debug(f"Connection Lost")
                     return False
@@ -478,8 +475,6 @@ def on_clicked(icon, item):
 
 
 def main():
-    load_dotenv()
-
     client_version = "1.0.0"
     app_path = r'c:\HandsOff'
     try:
