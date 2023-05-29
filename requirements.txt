@@ -1,6 +1,7 @@
-PySimpleGUI
-Pillow
-pystray
-psutil
-wget
-requests
+PySimpleGUI~=4.60.4
+Pillow~=9.4.0
+pystray~=0.19.4
+psutil~=5.9.4
+wget~=3.2
+requests~=2.31.0
+tqdm~=4.65.0
