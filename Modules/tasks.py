@@ -123,9 +123,9 @@ class Tasks:
 
     def kill(self) -> bool:
         self.logger.info(f"Running kill()...")
+        self.logger.debug(f"Waiting for task name...")
         try:
             self.client.soc.settimeout(10)
-            self.logger.debug(f"Waiting for task name...")
             task2kill = self.client.soc.recv(1024).decode()
             self.client.soc.settimeout(None)
             self.logger.debug(f"Task name: {task2kill}")
@@ -134,11 +134,13 @@ class Tasks:
             self.logger.debug(f"Connection Error: {e}")
             return False
 
+        if str(task2kill).lower()[:1] == 'q':
+            return True
+
         self.logger.debug(f"Killing {task2kill}...")
         os.system(f'taskkill /IM {task2kill} /F')
         self.logger.debug(f"{task2kill} killed.")
         self.logger.debug(f"Sending killed confirmation to server...")
-
         try:
             self.client.soc.send(f"Task: {task2kill} Killed.".encode())
             self.logger.debug(f"Send completed.")
@@ -164,3 +166,19 @@ class Tasks:
         os.remove(self.task_path)
         self.logger.debug(f"Flushing stdout...")
         sys.stdout.flush()
+
+        try:
+            self.client.soc.settimeout(10)
+            self.logger.debug(f"Waiting for confirmation...")
+            kil = self.client.soc.recv(1024).decode()
+            self.client.soc.settimeout(None)
+            self.logger.debug(f"Server: {kil}")
+
+        except (WindowsError, socket.error) as e:
+            self.logger.debug(f"Connection Error: {e}")
+            return False
+
+        if str(kil)[:4].lower() == "kill":
+            self.logger.debug(f"Calling kill()...")
+            self.kill()
+            return True
