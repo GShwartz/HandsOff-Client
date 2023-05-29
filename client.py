@@ -445,8 +445,6 @@ class Client:
         endpoint_welcome.send_current_user()
         self.logger.debug(f"Calling endpoint_welcome.send_client_version...")
         endpoint_welcome.send_client_version()
-        self.logger.debug(f"Calling endpoint_welcome.send_external_ip...")
-        endpoint_welcome.send_external_ip()
         self.logger.debug(f"Calling endpoint_welcome.send_os_platform...")
         endpoint_welcome.send_os_platform()
         self.logger.debug(f"Calling endpoint_welcome.send_boot_time...")

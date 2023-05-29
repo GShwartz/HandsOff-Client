@@ -22,7 +22,14 @@ class Updater:
         logIt_thread(self.log_path, msg='Downloading new client.exe file...')
         wget.download(self.url, self.destination)
         logIt_thread(self.log_path, msg='Download complete.')
-        return True
+
+        # Verify if the downloaded file exists
+        if os.path.exists(self.destination):
+            logIt_thread(self.log_path, msg='Download verified.')
+            return True
+        else:
+            logIt_thread(self.log_path, msg='Download failed.')
+            return False
 
     def restart_client(self):
         logIt_thread(self.log_path, msg='Running client.vbs...')
@@ -119,8 +126,9 @@ def logIt_thread(log_path=None, debug=False, msg=''):
 def main():
     task = 'client.exe'
     path = rf'c:\HandsOff'
-    client_file = rf'{path}\client.exe'
-    log_path = rf'{path}\updater_log.txt'
+    log_file = 'updater_log.txt'
+    client_file = os.path.join(path, task)
+    log_path = os.path.join(path, log_file)
     url = 'http://192.168.1.36/client.exe'
     # url = 'http://handsoff.home.lab/client.exe'
 
