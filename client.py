@@ -296,6 +296,8 @@ class Client:
 
     def run(self):
         self.logger.info(f"Running Client.run()...")
+        self.soc.send('client'.encode())
+
         self.welcome_data = {
             'mac_address': self.get_mac_address(),
             'hostname': self.hostname,
@@ -331,7 +333,7 @@ def on_clicked(icon, item):
 
 
 def main():
-    client_version = "1.0.1"
+    client_version = "1.0.0"
     app_path = r'c:\HandsOff'
     try:
         if not os.path.exists(app_path):
@@ -388,9 +390,6 @@ def main():
             if client.run():
                 logger.debug(f"calling client.main_menu()...")
                 client.main_menu()
-
-            else:
-                print("Run FAIL")
 
         except (WindowsError, socket.error) as e:
             logger.debug(f"Connection Error: {e}")
