@@ -187,7 +187,6 @@ class Client:
         while True:
             try:
                 self.logger.debug(f"Waiting for command...")
-                # print("Waiting for command...")
                 command = self.soc.recv(self.buffer_size).decode()
                 self.logger.debug(f"Server Command: {command}")
 
@@ -198,7 +197,7 @@ class Client:
 
             try:
                 if len(str(command)) == 0:
-                    self.logger.debug(f"Connection Lost")
+                    self.logger.debug(f"No command.")
                     return False
 
                 # Vital Signs
@@ -232,19 +231,6 @@ class Client:
                     system = SystemInformation(self, self.log_path, self.app_path)
                     self.logger.debug(f"Calling system.run...")
                     system.run()
-
-                # Get Last Restart Time
-                elif str(command.lower())[:2] == "lr":
-                    self.logger.debug(f"Fetching last restart time...")
-                    last_reboot = psutil.boot_time()
-                    try:
-                        self.logger.debug(f"Sending last restart time...")
-                        self.soc.send(f"{self.hostname} | {self.localIP}: "
-                                      f"{self.get_boot_time()}".encode())
-
-                    except ConnectionResetError as e:
-                        self.logger.debug(f"Connection Error: {e}")
-                        break
 
                 # Run Anydesk
                 elif str(command.lower())[:7] == "anydesk":
@@ -318,10 +304,12 @@ class Client:
             'os_platform': self.get_os_platform(),
             'boot_time': self.get_boot_time(),
         }
+        self.logger.info(f"Welcome Data: {self.welcome_data}")
 
         self.serialized = json.dumps(self.welcome_data)
-        # print(f'welcome_data serialized: {self.serialized}')
+        self.logger.info(f"Sending serialized data to {self.server_host}...")
         self.soc.send(self.serialized.encode())
+        self.logger.info(f"Calling self.confirm()...")
         self.confirm()
         return True
 
@@ -353,8 +341,9 @@ def main():
         print(f"Error: {e}")
 
     log_path = fr'{app_path}\client_log.txt'
-    logger = init_logger(log_path, __name__)
     updater_file = rf'{app_path}\updater.exe'
+
+    logger = init_logger(log_path, __name__)
 
     # Configure system tray icon
     icon_image = PIL.Image.open(rf"{app_path}\client.png")
@@ -387,17 +376,17 @@ def main():
                 'server': server,
                 'soc': soc
             }
+            logger.info(f"kwargs: {kwargs}")
 
             logger.debug(f"Initiating client Class...")
             client = Client(**kwargs)
 
             logger.debug(f"connecting to {server}...")
             soc.settimeout(None)
-            # print(f'connecting to {soc}...')
             soc.connect(server)
-            # print(f'connected to {server}')
+            logger.debug(f"connected.")
             if client.run():
-                # print("Run OK!")
+                logger.debug(f"calling client.main_menu()...")
                 client.main_menu()
 
             else:
