@@ -1,3 +1,4 @@
+import json
 from subprocess import Popen, PIPE
 import win32com.client as win32
 from datetime import datetime
@@ -15,6 +16,7 @@ import ctypes
 import pickle
 import time
 import wget
+import json
 import uuid
 import sys
 import os
@@ -27,113 +29,47 @@ from Modules.logger import init_logger
 from Modules.tasks import Tasks
 
 
-class Welcome:
-    def __init__(self, client, version, app_path, updater_file, logger, log_path):
-        self.log_path = log_path
-        self.logger = logger
-        self.updater_file = updater_file
-        self.app_path = app_path
-        self.client = client
-        self.client_version = version
-        self.ps_path = rf'{self.app_path}\maintenance.ps1'
-        self.anydesk_path = rf'c:\users\{os.getlogin()}\Downloads\anydesk.exe'
-
-        self.default_socket_timeout = None
-        self.menu_socket_timeout = None
-        self.intro_socket_timeout = 10
+class Client:
+    def __init__(self, **kwargs):
+        self.client_version = kwargs.get('client_version')
+        self.app_path = kwargs.get('app_path')
+        self.log_path = kwargs.get('log_path')
+        self.logger = kwargs.get('logger')
+        self.updater_file = kwargs.get('updater_file')
+        self.server_host = kwargs.get('server')[0]
+        self.server_port = kwargs.get('server')[1]
+        self.soc = kwargs.get('soc')
         self.buffer_size = 1024
 
-    def send_mac_address(self) -> str:
+        self.current_user = os.getlogin()
+        self.hostname = socket.gethostname()
+        self.localIP = str(socket.gethostbyname(self.hostname))
+
+        if not os.path.exists(f'{self.app_path}'):
+            self.logger.debug(f"Creating App dir...")
+            os.makedirs(self.app_path)
+
+    def connection(self) -> None:
+        self.logger.info(f"Running connection...")
+        try:
+            self.logger.debug(f"Connecting to Server: {self.server_host} | Port {self.server_port}...")
+            self.soc.connect((self.server_host, self.server_port))
+
+        except (TimeoutError, WindowsError, ConnectionAbortedError, ConnectionResetError, socket.timeout) as e:
+            self.logger.debug(f"Connection error: {e}")
+            return False
+
+    def get_mac_address(self) -> str:
         self.logger.info(f"Running send_mac_address...")
         mac = ':'.join(['{:02x}'.format((uuid.getnode() >> ele) & 0xff)
                         for ele in range(0, 8 * 6, 8)][::-1])
-        try:
-            self.logger.debug(f"Sending MAC address: {mac}...")
-            self.client.soc.send(mac.encode())
-            self.logger.debug(f"Waiting for confirmation...")
-            self.client.soc.settimeout(self.intro_socket_timeout)
-            message = self.client.soc.recv(self.buffer_size).decode()
-            self.client.soc.settimeout(self.default_socket_timeout)
-            self.logger.debug(f"Server: {message}")
-            self.logger.info(f"send_mac_address completed.")
+        return mac
 
-        except (WindowsError, socket.error, socket.timeout) as e:
-            self.logger.debug(f"Connection Error: {e}")
-            return False
-
-    def send_host_name(self) -> str:
-        self.logger.info(f"Running send_host_name...")
-        try:
-            self.logger.debug(f"Sending hostname: {self.client.hostname}...")
-            self.client.soc.send(self.client.hostname.encode())
-            self.logger.debug(f"Waiting for confirmation...")
-            self.client.soc.settimeout(self.intro_socket_timeout)
-            message = self.client.soc.recv(self.buffer_size).decode()
-            self.client.soc.settimeout(self.default_socket_timeout)
-            self.logger.debug(f"Server: {message}")
-            self.logger.info(f"send_host_name completed.")
-
-        except (WindowsError, socket.error) as e:
-            self.logger.debug(f"Connection Error: {e}")
-            return False
-
-    def send_current_user(self) -> str:
-        self.logger.info(f"Running send_current_user...")
-        try:
-            self.logger.debug(f"Sending current user: {self.client.current_user}...")
-            self.client.soc.send(self.client.current_user.encode())
-            self.logger.debug(f"Waiting for confirmation...")
-            self.client.soc.settimeout(self.intro_socket_timeout)
-            message = self.client.soc.recv(self.buffer_size).decode()
-            self.client.soc.settimeout(self.default_socket_timeout)
-            self.logger.debug(f"Server: {message}")
-            self.logger.info(f"send_current_user completed.")
-
-        except (WindowsError, socket.error) as e:
-            self.logger.debug(f"Connection error: {e}")
-            return False
-
-    def send_client_version(self):
-        self.logger.info(f"Running send_client_version...")
-        try:
-            self.logger.debug(f"Sending client version: {self.client_version}...")
-            self.client.soc.send(self.client_version.encode())
-            self.logger.debug(f"Waiting for confirmation...")
-            self.client.soc.settimeout(self.intro_socket_timeout)
-            message = self.client.soc.recv(self.buffer_size).decode()
-            self.client.soc.settimeout(self.default_socket_timeout)
-            self.logger.debug(f"Server: {message}")
-            self.logger.info(f"send_client_version completed.")
-
-        except (socket.error, WindowsError, socket.timeout) as e:
-            self.logger.debug(f"Connection error: {e}")
-            return False
-
-    def send_os_platform(self):
+    def get_os_platform(self):
+        self.logger.info(f"Running send_os_platform...")
         system = platform.system()
         release = platform.release()
-        self.logger.debug(f"Sending OS Platform: Windows {release}...")
-        self.client.soc.send(f'Windows {release}'.encode())
-        self.logger.debug(f"Waiting for confirmation...")
-        message = self.client.soc.recv(self.buffer_size).decode()
-        self.logger.debug(f"Server: {message}")
-        self.logger.info(f"send_os_platform completed.")
-        return
-
-    def send_boot_time(self):
-        self.logger.info(f"Running send_boot_time...")
-        try:
-            self.logger.debug(f"Sending Boot Time...")
-            bt = self.get_boot_time()
-            self.client.soc.send(str(bt).encode())
-            self.logger.debug(f"Waiting for confirmation...")
-            message = self.client.soc.recv(self.buffer_size).decode()
-            self.logger.debug(f"Server: {message}")
-            self.logger.info(f"send_boot_time completed.")
-
-        except (socket.error, WindowsError, socket.timeout) as e:
-            self.logger.debug(f"Connection error: {e}")
-            return False
+        return f'Windows {release}'
 
     def get_boot_time(self):
         self.logger.info(f"Running get_boot_time...")
@@ -144,9 +80,7 @@ class Welcome:
         self.logger.info(f"Running confirm...")
         try:
             self.logger.debug(f"Waiting for confirmation...")
-            self.client.soc.settimeout(self.intro_socket_timeout)
-            message = self.client.soc.recv(self.buffer_size).decode()
-            self.client.soc.settimeout(self.default_socket_timeout)
+            message = self.soc.recv(self.buffer_size).decode()
             self.logger.debug(f"Server: {message}")
             self.logger.info(f"confirm completed.")
 
@@ -171,30 +105,30 @@ class Welcome:
                 self.logger.debug(f"Calling anydeskThread()...")
                 anydeskThread.start()
                 self.logger.debug(f"Sending Confirmation...")
-                self.client.soc.send("OK".encode())
+                self.soc.send("OK".encode())
 
             else:
                 error = "Anydesk not installed."
                 self.logger.debug(f"Sending error message: {error}...")
-                self.client.soc.send(error.encode())
+                self.soc.send(error.encode())
 
                 try:
                     self.logger.debug(f"Waiting for install confirmation...")
-                    install = self.client.soc.recv(self.buffer_size).decode()
+                    install = self.soc.recv(self.buffer_size).decode()
                     if str(install).lower() == "y":
                         url = "https://download.anydesk.com/AnyDesk.exe"
                         destination = rf'c:\users\{os.getlogin()}\Downloads\anydesk.exe'
 
                         if not os.path.exists(destination):
                             self.logger.debug(f"Sending downloading message...")
-                            self.client.soc.send("Downloading anydesk...".encode())
+                            self.soc.send("Downloading anydesk...".encode())
 
                             self.logger.debug(f"Downloading anydesk.exe..")
                             wget.download(url, destination)
                             self.logger.debug(f"Download complete.")
 
                         self.logger.debug(f"Sending running anydesk message...")
-                        self.client.soc.send("Running anydesk...".encode())
+                        self.soc.send("Running anydesk...".encode())
 
                         self.logger.debug(f"Running anydesk...")
                         programThread = Thread(target=run_ad, name='programThread')
@@ -202,10 +136,10 @@ class Welcome:
                         programThread.start()
 
                         self.logger.debug(f"Sending Confirmation...")
-                        self.client.soc.send("Anydesk Running.".encode())
+                        self.soc.send("Anydesk Running.".encode())
 
                         self.logger.debug(f"Sending final confirmation...")
-                        self.client.soc.send("OK".encode())
+                        self.soc.send("OK".encode())
 
                     else:
                         return False
@@ -250,11 +184,11 @@ class Welcome:
 
     def main_menu(self):
         self.logger.info(f"Running main_menu...")
-        self.client.soc.settimeout(self.menu_socket_timeout)
         while True:
             try:
                 self.logger.debug(f"Waiting for command...")
-                command = self.client.soc.recv(self.buffer_size).decode()
+                # print("Waiting for command...")
+                command = self.soc.recv(self.buffer_size).decode()
                 self.logger.debug(f"Server Command: {command}")
 
             except (ConnectionResetError, ConnectionError,
@@ -272,7 +206,7 @@ class Welcome:
                     self.logger.debug(f"Calling Vital Signs...")
                     try:
                         self.logger.debug(f"Answer yes to server...")
-                        self.client.soc.send('yes'.encode())
+                        self.soc.send('yes'.encode())
 
                     except (WindowsError, socket.error) as e:
                         self.logger.debug(f"Error: {e}")
@@ -288,14 +222,14 @@ class Welcome:
                 # Capture Screenshot
                 elif str(command.lower())[:6] == "screen":
                     self.logger.debug(f"Initiating screenshot class...")
-                    screenshot = Screenshot(self.client, self.log_path, self.app_path)
+                    screenshot = Screenshot(self, self.log_path, self.app_path)
                     self.logger.debug(f"Calling screenshot.run...")
                     screenshot.run()
 
                 # Get System Information & Users
                 elif str(command.lower())[:2] == "si":
                     self.logger.debug(f"Initiating SystemInformation class...")
-                    system = SystemInformation(self.client, self.log_path, self.app_path)
+                    system = SystemInformation(self, self.log_path, self.app_path)
                     self.logger.debug(f"Calling system.run...")
                     system.run()
 
@@ -305,8 +239,8 @@ class Welcome:
                     last_reboot = psutil.boot_time()
                     try:
                         self.logger.debug(f"Sending last restart time...")
-                        self.client.soc.send(f"{self.client.hostname} | {self.client.localIP}: "
-                                             f"{self.get_boot_time()}".encode())
+                        self.soc.send(f"{self.hostname} | {self.localIP}: "
+                                      f"{self.get_boot_time()}".encode())
 
                     except ConnectionResetError as e:
                         self.logger.debug(f"Connection Error: {e}")
@@ -321,14 +255,14 @@ class Welcome:
                 # Task List
                 elif str(command.lower())[:5] == "tasks":
                     self.logger.debug(f"Calling tasks...")
-                    task = Tasks(self.client, self.log_path, self.app_path)
+                    task = Tasks(self, self.log_path, self.app_path)
                     task.run()
 
                 # Kill Task
                 elif str(command.lower())[:4] == "kill":
                     self.logger.debug(f"Waiting for task name...")
                     try:
-                        task2kill = self.client.soc.recv(1024).decode()
+                        task2kill = self.soc.recv(1024).decode()
                         self.logger.debug(f"Task name: {task2kill}")
 
                     except (WindowsError, socket.error) as e:
@@ -340,7 +274,7 @@ class Welcome:
                     self.logger.debug(f"{task2kill} killed.")
                     self.logger.debug(f"Sending killed confirmation to server...")
                     try:
-                        self.client.soc.send(f"Task: {task2kill} Killed.".encode())
+                        self.soc.send(f"Task: {task2kill} Killed.".encode())
                         self.logger.debug(f"Send completed.")
 
                     except (WindowsError, socket.error) as e:
@@ -363,30 +297,10 @@ class Welcome:
                         self.logger.debug(f"ERROR: {e}")
                         return False
 
-                # Maintenance
-                elif str(command.lower()) == "maintenance":
-                    waiting_msg = "waiting"
-                    try:
-                        self.logger.debug(f"Sending waiting message...")
-                        self.client.soc.send(waiting_msg.encode())
-
-                    except (WindowsError, socket.error) as e:
-                        self.logger.debug(f"ERROR: {e}")
-                        return False
-
-                    logger.debug(f"Initializing maintenance class...")
-                    maintenance = Maintenance(self.ps_path, self.client, self.log_path)
-                    logger.debug(f"Calling maintenance...")
-                    maintenance.maintenance()
-                    logger.debug(f"Calling self.connection...")
-                    self.client.connection()
-                    logger.debug(f"Calling main_menu...")
-                    self.main_menu()
-
                 # Close Connection
                 elif str(command.lower())[:4] == "exit":
                     self.logger.debug(f"Server closed the connection.")
-                    self.client.soc.settimeout(1)
+                    self.soc.settimeout(1)
                     # sys.exit(0)     # CI CD
                     break  # CICD
 
@@ -394,56 +308,21 @@ class Welcome:
                 self.logger.debug(f"Connection Error: {err}")
                 break
 
+    def run(self):
+        self.logger.info(f"Running Client.run()...")
+        self.welcome_data = {
+            'mac_address': self.get_mac_address(),
+            'hostname': self.hostname,
+            'current_user': self.current_user,
+            'client_version': self.client_version,
+            'os_platform': self.get_os_platform(),
+            'boot_time': self.get_boot_time(),
+        }
 
-class Client:
-    def __init__(self, server, soc, client_version, app_path, updater_file, logger, log_path):
-        self.log_path = log_path
-        self.logger = logger
-        self.updater_file = updater_file
-        self.app_path = app_path
-        self.client_version = client_version
-        self.server_host = server[0]
-        self.server_port = server[1]
-        self.current_user = os.getlogin()
-        self.hostname = socket.gethostname()
-        self.localIP = str(socket.gethostbyname(self.hostname))
-        self.soc = soc
-
-        if not os.path.exists(f'{self.app_path}'):
-            self.logger.debug(f"Creating App dir...")
-            os.makedirs(self.app_path)
-
-    def connection(self) -> None:
-        self.logger.info(f"Running connection...")
-        try:
-            self.logger.debug(f"Connecting to Server: {self.server_host} | Port {self.server_port}...")
-            self.soc.connect((self.server_host, self.server_port))
-
-        except (TimeoutError, WindowsError, ConnectionAbortedError, ConnectionResetError, socket.timeout) as e:
-            self.logger.debug(f"Connection error: {e}")
-            return False
-
-    def welcome(self):
-        self.logger.info(f"Running welcome...")
-        self.logger.debug(f"Initiating Welcome class..")
-        endpoint_welcome = Welcome(self, self.client_version, self.app_path,
-                                   self.updater_file, self.logger, self.log_path)
-        self.logger.debug(f"Calling endpoint_welcome.send_mac_address...")
-        endpoint_welcome.send_mac_address()
-        self.logger.debug(f"Calling endpoint_welcome.send_host_name...")
-        endpoint_welcome.send_host_name()
-        self.logger.debug(f"Calling endpoint_welcome.send_current_user...")
-        endpoint_welcome.send_current_user()
-        self.logger.debug(f"Calling endpoint_welcome.send_client_version...")
-        endpoint_welcome.send_client_version()
-        self.logger.debug(f"Calling endpoint_welcome.send_os_platform...")
-        endpoint_welcome.send_os_platform()
-        self.logger.debug(f"Calling endpoint_welcome.send_boot_time...")
-        endpoint_welcome.send_boot_time()
-        self.logger.debug(f"Calling endpoint_welcome.confirm...")
-        endpoint_welcome.confirm()
-        self.logger.debug(f"Calling endpoint_welcome.main_menu...")
-        endpoint_welcome.main_menu()
+        self.serialized = json.dumps(self.welcome_data)
+        # print(f'welcome_data serialized: {self.serialized}')
+        self.soc.send(self.serialized.encode())
+        self.confirm()
         return True
 
 
@@ -464,7 +343,7 @@ def on_clicked(icon, item):
 
 
 def main():
-    client_version = "1.0.0"
+    client_version = "1.0.1"
     app_path = r'c:\HandsOff'
     try:
         if not os.path.exists(app_path):
@@ -499,15 +378,30 @@ def main():
             logger.debug(f"Defining socket to Reuse address...")
             soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
+            kwargs = {
+                'client_version': client_version,
+                'app_path': app_path,
+                'log_path': log_path,
+                'logger': logger,
+                'updater_file': updater_file,
+                'server': server,
+                'soc': soc
+            }
+
             logger.debug(f"Initiating client Class...")
-            client = Client(server, soc, client_version,
-                            app_path, updater_file, logger, log_path)
+            client = Client(**kwargs)
 
             logger.debug(f"connecting to {server}...")
             soc.settimeout(None)
+            # print(f'connecting to {soc}...')
             soc.connect(server)
-            logger.debug(f"Calling backdoor({soc})...")
-            client.welcome()
+            # print(f'connected to {server}')
+            if client.run():
+                # print("Run OK!")
+                client.main_menu()
+
+            else:
+                print("Run FAIL")
 
         except (WindowsError, socket.error) as e:
             logger.debug(f"Connection Error: {e}")
