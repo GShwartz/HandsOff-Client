@@ -101,40 +101,6 @@ class Updater:
                     i += 1
 
 
-def get_date():
-    d = datetime.now().replace(microsecond=0)
-    dt = str(d.strftime("%b %d %Y %I.%M.%S %p"))
-
-    return dt
-
-
-def logIt(logfile=None, debug=None, msg=''):
-    dt = get_date()
-    if debug:
-        print(f"{dt}: {msg}")
-
-    if logfile is not None:
-        try:
-            if not os.path.exists(logfile):
-                with open(logfile, 'w') as lf:
-                    lf.write(f"{dt}: {msg}\n")
-                    return True
-
-            else:
-                with open(logfile, 'a') as lf:
-                    lf.write(f"{dt}: {msg}\n")
-                return True
-
-        except FileExistsError:
-            pass
-
-
-def logIt_thread(log_path=None, debug=False, msg=''):
-    logit_thread = Thread(target=logIt, args=(log_path, debug, msg), name="Log Thread")
-    logit_thread.start()
-    return
-
-
 def main():
     task = 'client.exe'
     path = rf'c:\HandsOff'
