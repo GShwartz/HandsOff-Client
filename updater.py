@@ -22,14 +22,7 @@ class Updater:
         logIt_thread(self.log_path, msg='Downloading new client.exe file...')
         wget.download(self.url, self.destination)
         logIt_thread(self.log_path, msg='Download complete.')
-
-        # Verify if the downloaded file exists
-        if os.path.exists(self.destination):
-            logIt_thread(self.log_path, msg='Download verified.')
-            return True
-        else:
-            logIt_thread(self.log_path, msg='Download failed.')
-            return False
+        return True
 
     def restart_client(self):
         logIt_thread(self.log_path, msg='Running client.vbs...')
@@ -68,16 +61,12 @@ class Updater:
             subprocess.run(['taskkill', '/IM', self.task, '/F'])
             time.sleep(2)
 
-        # Delete current client.exe file
-        if self.check_source_connection() and os.path.exists(self.destination):
-            logIt_thread(self.log_path, msg=f'Removing {self.destination}...')
+        if os.path.exists(self.destination):
             os.remove(self.destination)
-            self.download()
-            time.sleep(1)
-            self.restart_client()
 
-        else:
-            self.restart_client()
+        wget.download(self.url, self.destination)
+        time.sleep(1)
+        self.restart_client()
 
         for i in range(3):
             if i == 3:
@@ -126,9 +115,8 @@ def logIt_thread(log_path=None, debug=False, msg=''):
 def main():
     task = 'client.exe'
     path = rf'c:\HandsOff'
-    log_file = 'updater_log.txt'
-    client_file = os.path.join(path, task)
-    log_path = os.path.join(path, log_file)
+    client_file = rf'{path}\client.exe'
+    log_path = rf'{path}\updater_log.txt'
     url = 'http://192.168.1.36/client.exe'
     # url = 'http://handsoff.home.lab/client.exe'
 
